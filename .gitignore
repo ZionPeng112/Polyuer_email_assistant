@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+data/
+attachments/
+credentials/
+google_oauth_client.json
+google_token.json
+*.db
+*.sqlite
+*.sqlite3
+
+.DS_Store

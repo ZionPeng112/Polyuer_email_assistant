@@ -1,0 +1,62 @@
+name: Daily Email Digest
+
+on:
+  schedule:
+    # 23:55 Asia/Shanghai. GitHub Actions schedules are UTC.
+    - cron: "55 15 * * *"
+  workflow_dispatch:
+
+jobs:
+  daily-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Restore Gmail OAuth files
+        shell: bash
+        env:
+          GOOGLE_OAUTH_CLIENT_JSON_B64: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON_B64 }}
+          GOOGLE_OAUTH_TOKEN_JSON_B64: ${{ secrets.GOOGLE_OAUTH_TOKEN_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p credentials data
+          printf '%s' "$GOOGLE_OAUTH_CLIENT_JSON_B64" | base64 --decode > credentials/google_oauth_client.json
+          printf '%s' "$GOOGLE_OAUTH_TOKEN_JSON_B64" | base64 --decode > data/google_token.json
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Generate and send digest
+        env:
+          MAIL_PROVIDER: gmail
+          GMAIL_USER: me
+          GMAIL_ACCOUNT_EMAIL: zionpeng112@gmail.com
+          GOOGLE_OAUTH_CLIENT_SECRETS: credentials/google_oauth_client.json
+          GOOGLE_OAUTH_TOKEN_FILE: data/google_token.json
+          TARGET_EMAIL: zionpeng112@gmail.com
+          ALLOWED_SENDER_DOMAINS: polyu.edu.hk
+          LOCAL_TIMEZONE: Asia/Shanghai
+          N1N_API_KEY: ${{ secrets.N1N_API_KEY }}
+          N1N_BASE_URL: https://api.n1n.ai/v1
+          LLM_MODEL: gpt-5.5
+          DATABASE_URL: sqlite:///data/emails.db
+          DIGEST_RECIPIENT_EMAIL: pengqz112@gmail.com
+          DIGEST_FROM_EMAIL: zionpeng112@gmail.com
+          DIGEST_SUBJECT_PREFIX: PolyU 每日 Email Digest
+          ENABLE_IMAGE_ANALYSIS: "true"
+          ENABLE_REMOTE_IMAGE_URLS: "true"
+          MAX_IMAGE_ATTACHMENTS: "4"
+          MAX_IMAGE_BYTES: "2000000"
+        run: python -m email_assistant.main daily --today
