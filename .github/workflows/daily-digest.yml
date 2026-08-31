@@ -57,7 +57,7 @@ jobs:
           DIGEST_FROM_EMAIL: zionpeng112@gmail.com
           DIGEST_SUBJECT_PREFIX: PolyU 每日 Email Digest
           ENABLE_IMAGE_ANALYSIS: "true"
-          ENABLE_REMOTE_IMAGE_URLS: "false"
+          ENABLE_REMOTE_IMAGE_URLS: "true"
           MAX_IMAGE_ATTACHMENTS: "4"
           MAX_IMAGE_BYTES: "2000000"
         run: python -m email_assistant.main daily --yesterday

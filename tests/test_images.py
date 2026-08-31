@@ -1,3 +1,5 @@
+import httpx
+
 from email_assistant.images import is_supported_image_attachment, load_images_for_llm
 from email_assistant.models import EmailAttachment, HtmlImage, RawEmail
 
@@ -52,7 +54,16 @@ def test_image_attachment_detection_rejects_non_images():
     assert is_supported_image_attachment(EmailAttachment(id="2", content_type="image/jpeg")) is True
 
 
-def test_load_images_for_llm_can_include_remote_html_images():
+def test_load_images_for_llm_downloads_remote_html_images(monkeypatch):
+    def fake_get(*args, **kwargs):
+        return httpx.Response(
+            200,
+            headers={"content-type": "image/png"},
+            content=b"abc",
+            request=httpx.Request("GET", "https://example.com/poster.png"),
+        )
+
+    monkeypatch.setattr("email_assistant.images.httpx.get", fake_get)
     email = RawEmail(
         id="email-1",
         subject="Poster",
@@ -76,4 +87,6 @@ def test_load_images_for_llm_can_include_remote_html_images():
     )
 
     assert images[0].source == "remote_html"
-    assert images[0].data_url == "https://example.com/poster.png"
+    assert images[0].data_url == "data:image/png;base64,YWJj"
+    assert images[0].content_type == "image/png"
+    assert images[0].sha256
