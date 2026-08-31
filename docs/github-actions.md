@@ -9,6 +9,15 @@ The daily workflow is defined in:
 It runs every day at 09:30 Asia/Shanghai and can also be started manually from the
 GitHub Actions tab.
 
+The cloud workflow disables remote HTML image URLs for reliability:
+
+```text
+ENABLE_REMOTE_IMAGE_URLS=false
+```
+
+The parser still reads email text, HTML text, links embedded in visible content, and attachment
+metadata. Local runs can keep remote image analysis enabled through `.env`.
+
 ## Required Secrets
 
 Set these GitHub repository secrets:
