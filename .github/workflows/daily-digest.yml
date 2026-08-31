@@ -51,6 +51,7 @@ jobs:
           N1N_API_KEY: ${{ secrets.N1N_API_KEY }}
           N1N_BASE_URL: https://api.n1n.ai/v1
           LLM_MODEL: gpt-5.5
+          N1N_TIMEOUT_SECONDS: "180"
           DATABASE_URL: sqlite:///data/emails.db
           DIGEST_RECIPIENT_EMAIL: pengqz112@gmail.com
           DIGEST_FROM_EMAIL: zionpeng112@gmail.com

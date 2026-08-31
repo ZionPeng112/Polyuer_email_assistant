@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import httpx
@@ -16,9 +17,11 @@ class N1NLLMProvider:
         model: str,
         *,
         base_url: str = "https://api.n1n.ai/v1",
-        timeout: float = 60.0,
+        timeout: float = 180.0,
+        max_retries: int = 2,
     ) -> None:
         self.model = model
+        self._max_retries = max_retries
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             timeout=timeout,
@@ -67,7 +70,7 @@ class N1NLLMProvider:
                 {"role": "user", "content": user_content},
             ],
         }
-        response = self._client.post("/chat/completions", json=payload)
+        response = self._post_with_retries(payload)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -79,3 +82,15 @@ class N1NLLMProvider:
             return data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError(f"Unexpected n1n response shape: {data}") from exc
+
+    def _post_with_retries(self, payload: dict[str, Any]) -> httpx.Response:
+        last_error: Exception | None = None
+        for attempt in range(self._max_retries + 1):
+            try:
+                return self._client.post("/chat/completions", json=payload)
+            except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.RemoteProtocolError) as exc:
+                last_error = exc
+                if attempt >= self._max_retries:
+                    break
+                time.sleep(2**attempt)
+        raise RuntimeError("n1n API request timed out after retries.") from last_error

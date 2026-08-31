@@ -103,6 +103,7 @@ def _process(
             config.n1n_api_key,
             config.llm_model,
             base_url=config.n1n_base_url,
+            timeout=config.n1n_timeout_seconds,
         ) as llm,
         EmailDatabase(config.database_url) as db,
     ):

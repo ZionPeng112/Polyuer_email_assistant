@@ -30,6 +30,7 @@ class AppConfig:
     n1n_api_key: str
     n1n_base_url: str
     llm_model: str
+    n1n_timeout_seconds: int
     database_url: str
     digest_recipient_email: str
     digest_from_email: str
@@ -64,6 +65,7 @@ class AppConfig:
             n1n_api_key=os.getenv("N1N_API_KEY", "").strip(),
             n1n_base_url=os.getenv("N1N_BASE_URL", DEFAULT_N1N_BASE_URL).rstrip("/"),
             llm_model=os.getenv("LLM_MODEL", "").strip(),
+            n1n_timeout_seconds=_env_int("N1N_TIMEOUT_SECONDS", default=180),
             database_url=os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL).strip(),
             digest_recipient_email=os.getenv("DIGEST_RECIPIENT_EMAIL", "").strip(),
             digest_from_email=os.getenv("DIGEST_FROM_EMAIL", "").strip(),
