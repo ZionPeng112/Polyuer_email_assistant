@@ -95,6 +95,7 @@ def _process(
     processed = 0
     skipped = 0
     filtered = 0
+    failed = 0
     analyses = []
 
     with (
@@ -139,10 +140,30 @@ def _process(
                     html_images=parsed.html_images,
                     include_remote_urls=config.enable_remote_image_urls,
                 )
-            analysis = replace(
-                analyzer.analyze(parsed, images=images),
-                subject=clean_forwarded_subject(email.subject),
-            )
+            try:
+                analysis = replace(
+                    analyzer.analyze(parsed, images=images),
+                    subject=clean_forwarded_subject(email.subject),
+                )
+            except Exception as exc:
+                if images:
+                    print(
+                        f"Image analysis failed for {email.id}; retrying text-only. "
+                        f"Reason: {exc}"
+                    )
+                    try:
+                        analysis = replace(
+                            analyzer.analyze(parsed, images=[]),
+                            subject=clean_forwarded_subject(email.subject),
+                        )
+                    except Exception as retry_exc:
+                        failed += 1
+                        print(f"Text-only analysis failed for {email.id}; skipping. Reason: {retry_exc}")
+                        continue
+                else:
+                    failed += 1
+                    print(f"Analysis failed for {email.id}; skipping. Reason: {exc}")
+                    continue
             analyses.append(analysis)
 
             if not dry_run:
@@ -156,7 +177,7 @@ def _process(
 
     print(
         f"Processed {processed} email(s); skipped {skipped} already processed email(s); "
-        f"filtered {filtered} sender(s)."
+        f"filtered {filtered} sender(s); failed {failed} email(s)."
     )
     if analyses:
         if dry_run:
