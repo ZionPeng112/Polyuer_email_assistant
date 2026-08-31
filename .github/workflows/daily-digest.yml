@@ -2,8 +2,8 @@ name: Daily Email Digest
 
 on:
   schedule:
-    # 23:55 Asia/Shanghai. GitHub Actions schedules are UTC.
-    - cron: "55 15 * * *"
+    # 09:30 Asia/Shanghai. GitHub Actions schedules are UTC.
+    - cron: "30 1 * * *"
   workflow_dispatch:
 
 jobs:
@@ -59,4 +59,4 @@ jobs:
           ENABLE_REMOTE_IMAGE_URLS: "true"
           MAX_IMAGE_ATTACHMENTS: "4"
           MAX_IMAGE_BYTES: "2000000"
-        run: python -m email_assistant.main daily --today
+        run: python -m email_assistant.main daily --yesterday

@@ -122,11 +122,11 @@ The repository includes a scheduled workflow:
 .github/workflows/daily-digest.yml
 ```
 
-It starts a temporary Linux runner every day, installs Python dependencies, restores Gmail OAuth
+It starts a temporary Linux runner every day at 09:30 Asia/Shanghai, installs Python dependencies, restores Gmail OAuth
 from GitHub Secrets, runs tests, and sends the Daily Digest with:
 
 ```bash
-python -m email_assistant.main daily --today
+python -m email_assistant.main daily --yesterday
 ```
 
 See [docs/github-actions.md](docs/github-actions.md) for the required secrets and setup commands.

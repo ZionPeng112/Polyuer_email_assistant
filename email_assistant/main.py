@@ -27,22 +27,39 @@ def main() -> None:
     if args.command == "fetch-test":
         _fetch_test(config, limit=args.limit)
     elif args.command == "process":
+        window = _window_from_args(args, config)
         _process(
             config,
-            since=_since_from_args(args, config),
+            window=window,
             limit=args.limit,
             dry_run=args.dry_run,
             force=args.force,
         )
     elif args.command == "digest":
-        _digest(config, window=_window_from_args(args, config), language=args.language)
+        window = _window_from_args(args, config)
+        _digest(
+            config,
+            window=window,
+            language=args.language,
+            digest_date=_digest_date_from_args(args, window, config),
+        )
     elif args.command == "send-digest":
-        _send_digest(config, window=_window_from_args(args, config), language=args.language)
+        window = _window_from_args(args, config)
+        _send_digest(
+            config,
+            window=window,
+            language=args.language,
+            digest_date=_digest_date_from_args(args, window, config),
+        )
     elif args.command == "daily":
         window = _window_from_args(args, config)
-        since = window[0]
-        _process(config, since=since, limit=args.limit, dry_run=False, force=args.force)
-        _send_digest(config, window=window, language=args.language)
+        _process(config, window=window, limit=args.limit, dry_run=False, force=args.force)
+        _send_digest(
+            config,
+            window=window,
+            language=args.language,
+            digest_date=_digest_date_from_args(args, window, config),
+        )
     else:
         raise ValueError(f"Unknown command: {args.command}")
 
@@ -67,12 +84,13 @@ def _fetch_test(config: AppConfig, *, limit: int) -> None:
 def _process(
     config: AppConfig,
     *,
-    since: datetime,
+    window: tuple[datetime, datetime | None],
     limit: int | None,
     dry_run: bool,
     force: bool = False,
 ) -> None:
     config.require_llm()
+    since, until = window
 
     processed = 0
     skipped = 0
@@ -93,6 +111,9 @@ def _process(
         emails = provider.fetch_recent_emails(since=since, target_email=config.target_email, limit=limit)
 
         for email in emails:
+            if until and email.created_at and email.created_at >= until:
+                filtered += 1
+                continue
             parsed = parse_email(email)
             if not is_allowed_sender(
                 email,
@@ -144,9 +165,15 @@ def _process(
             print(build_daily_digest_zh(analyses))
 
 
-def _digest(config: AppConfig, *, window: tuple[datetime, datetime | None], language: str) -> None:
+def _digest(
+    config: AppConfig,
+    *,
+    window: tuple[datetime, datetime | None],
+    language: str,
+    digest_date,
+) -> None:
     analyses = _load_analyses_for_window(config, window=window)
-    print(_build_digest(analyses, language=language, digest_date=_digest_date(window, config)))
+    print(_build_digest(analyses, language=language, digest_date=digest_date))
 
 
 def _load_analyses_for_window(
@@ -167,6 +194,7 @@ def _send_digest(
     *,
     window: tuple[datetime, datetime | None],
     language: str,
+    digest_date,
 ) -> None:
     if config.mail_provider != "gmail":
         raise ValueError("send-digest currently uses Gmail API. Set MAIL_PROVIDER=gmail.")
@@ -174,8 +202,8 @@ def _send_digest(
     config.require_digest_email()
 
     analyses = _load_analyses_for_window(config, window=window)
-    digest = _build_digest(analyses, language=language, digest_date=_digest_date(window, config))
-    subject = f"{config.digest_subject_prefix} - {_subject_date(window, config)}"
+    digest = _build_digest(analyses, language=language, digest_date=digest_date)
+    subject = f"{config.digest_subject_prefix} - {digest_date.strftime('%Y-%m-%d')}"
     with gmail_provider(config) as gmail:
         sent = gmail.send_email(
             sender=config.digest_from_email,
@@ -233,24 +261,28 @@ def _since_from_args(args: argparse.Namespace, config: AppConfig) -> datetime:
 
 
 def _window_from_args(args: argparse.Namespace, config: AppConfig) -> tuple[datetime, datetime | None]:
+    local_zone = ZoneInfo(config.local_timezone)
     if getattr(args, "date", None):
-        local_zone = ZoneInfo(config.local_timezone)
         start_local = datetime.strptime(args.date, "%Y-%m-%d").replace(tzinfo=local_zone)
         end_local = start_local + timedelta(days=1)
         return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
+    if getattr(args, "yesterday", False):
+        today = datetime.now(local_zone).replace(hour=0, minute=0, second=0, microsecond=0)
+        start_local = today - timedelta(days=1)
+        return start_local.astimezone(timezone.utc), today.astimezone(timezone.utc)
     if getattr(args, "today", False):
-        local_zone = ZoneInfo(config.local_timezone)
         now = datetime.now(local_zone)
         start = now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
         return start, None
     return datetime.now(timezone.utc) - timedelta(hours=args.hours), None
 
 
-def _subject_date(window: tuple[datetime, datetime | None], config: AppConfig) -> str:
-    return _digest_date(window, config).strftime("%Y-%m-%d")
+def _digest_date_from_args(args: argparse.Namespace, window: tuple[datetime, datetime | None], config: AppConfig):
+    if getattr(args, "digest_date", None):
+        return datetime.strptime(args.digest_date, "%Y-%m-%d").date()
+    if getattr(args, "yesterday", False):
+        return datetime.now(ZoneInfo(config.local_timezone)).date()
 
-
-def _digest_date(window: tuple[datetime, datetime | None], config: AppConfig):
     start, end = window
     local_zone = ZoneInfo(config.local_timezone)
     if end is not None:
@@ -268,6 +300,8 @@ def _parse_args() -> argparse.Namespace:
     process = subparsers.add_parser("process", help="Process recent emails through the LLM.")
     process.add_argument("--hours", type=int, default=24)
     process.add_argument("--today", action="store_true")
+    process.add_argument("--yesterday", action="store_true")
+    process.add_argument("--date")
     process.add_argument("--limit", type=int, default=None)
     process.add_argument("--dry-run", action="store_true")
     process.add_argument("--force", action="store_true")
@@ -275,19 +309,25 @@ def _parse_args() -> argparse.Namespace:
     digest = subparsers.add_parser("digest", help="Build digest from saved analyses.")
     digest.add_argument("--hours", type=int, default=24)
     digest.add_argument("--today", action="store_true")
+    digest.add_argument("--yesterday", action="store_true")
     digest.add_argument("--date")
+    digest.add_argument("--digest-date")
     digest.add_argument("--language", choices=["en", "zh"], default="zh")
 
     send_digest = subparsers.add_parser("send-digest", help="Email digest from saved analyses.")
     send_digest.add_argument("--hours", type=int, default=24)
     send_digest.add_argument("--today", action="store_true")
+    send_digest.add_argument("--yesterday", action="store_true")
     send_digest.add_argument("--date")
+    send_digest.add_argument("--digest-date")
     send_digest.add_argument("--language", choices=["en", "zh"], default="zh")
 
     daily = subparsers.add_parser("daily", help="Process recent emails and email the digest.")
     daily.add_argument("--hours", type=int, default=24)
     daily.add_argument("--today", action="store_true")
+    daily.add_argument("--yesterday", action="store_true")
     daily.add_argument("--date")
+    daily.add_argument("--digest-date")
     daily.add_argument("--limit", type=int, default=None)
     daily.add_argument("--language", choices=["en", "zh"], default="zh")
     daily.add_argument("--force", action="store_true")

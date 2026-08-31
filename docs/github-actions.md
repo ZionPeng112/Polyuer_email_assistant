@@ -6,7 +6,7 @@ The daily workflow is defined in:
 .github/workflows/daily-digest.yml
 ```
 
-It runs every day at 23:55 Asia/Shanghai and can also be started manually from the
+It runs every day at 09:30 Asia/Shanghai and can also be started manually from the
 GitHub Actions tab.
 
 ## Required Secrets
@@ -55,8 +55,9 @@ They are not committed to the repository.
 The scheduled job runs:
 
 ```bash
-python -m email_assistant.main daily --today
+python -m email_assistant.main daily --yesterday
 ```
 
-Because `--today` uses `LOCAL_TIMEZONE=Asia/Shanghai`, the workflow is scheduled near the
-end of the local day so the digest covers that day's forwarded PolyU email.
+Because `--yesterday` uses `LOCAL_TIMEZONE=Asia/Shanghai`, the workflow covers the full previous
+local day, from 00:00 through 24:00 Asia/Shanghai. The digest itself is dated on the send day, so
+events happening that morning/day are still shown under "今天的活动".
