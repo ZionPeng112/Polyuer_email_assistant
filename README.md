@@ -122,7 +122,7 @@ The repository includes a scheduled workflow:
 .github/workflows/daily-digest.yml
 ```
 
-It starts a temporary Linux runner every day at 11:25 Asia/Shanghai. It installs Python
+It starts a temporary Linux runner every day at 11:40 Asia/Shanghai. It installs Python
 dependencies, restores Gmail OAuth from GitHub Secrets, runs tests, and sends the Daily Digest with:
 
 ```bash

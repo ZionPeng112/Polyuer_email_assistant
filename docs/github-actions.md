@@ -6,7 +6,7 @@ The daily workflow is defined in:
 .github/workflows/daily-digest.yml
 ```
 
-It runs every day at 11:25 Asia/Shanghai and can also be started manually from the GitHub
+It runs every day at 11:40 Asia/Shanghai and can also be started manually from the GitHub
 Actions tab.
 
 The cloud workflow keeps image analysis enabled:

@@ -2,8 +2,8 @@ name: Daily Email Digest
 
 on:
   schedule:
-    # 11:25 Asia/Shanghai. GitHub Actions schedules are UTC.
-    - cron: "25 3 * * *"
+    # 11:40 Asia/Shanghai. GitHub Actions schedules are UTC.
+    - cron: "40 3 * * *"
   workflow_dispatch:
 
 concurrency:
