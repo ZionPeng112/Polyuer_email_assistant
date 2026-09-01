@@ -13,7 +13,7 @@ DEFAULT_DATABASE_URL = "sqlite:///data/emails.db"
 DEFAULT_GOOGLE_OAUTH_CLIENT_SECRETS = "credentials/google_oauth_client.json"
 DEFAULT_GOOGLE_OAUTH_TOKEN_FILE = "data/google_token.json"
 DEFAULT_DIGEST_SUBJECT_PREFIX = "PolyU Daily Email Digest"
-DEFAULT_LOCAL_TIMEZONE = "Asia/Shanghai"
+DEFAULT_LOCAL_TIMEZONE = "Asia/Hong_Kong"
 
 
 @dataclass(frozen=True)

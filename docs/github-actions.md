@@ -6,8 +6,9 @@ The daily workflow is defined in:
 .github/workflows/daily-digest.yml
 ```
 
-It runs every day at 11:40 Asia/Shanghai and can also be started manually from the GitHub
-Actions tab.
+GitHub's built-in `schedule` event is not used because it did not reliably dispatch runs for
+this repository. The workflow is triggered with `workflow_dispatch`, either manually from the
+GitHub Actions tab or by an external cron service.
 
 The cloud workflow keeps image analysis enabled:
 
@@ -60,19 +61,61 @@ data/emails.db
 
 They are not committed to the repository.
 
-Scheduled workflow logs only report processing and delivery status. They do not print the digest
-body, evidence fields, or "判断依据" content.
+Workflow logs only report processing and delivery status. They do not print the digest body,
+evidence fields, or "判断依据" content.
+
+## External Cron
+
+Configure an external cron service to call GitHub's workflow dispatch endpoint every day at
+11:40 Asia/Hong_Kong.
+
+If the cron service supports time zones, use:
+
+```text
+40 11 * * *
+```
+
+with time zone:
+
+```text
+Asia/Hong_Kong
+```
+
+If it only supports UTC, use:
+
+```text
+40 3 * * *
+```
+
+Create a fine-grained GitHub personal access token for this repository with:
+
+```text
+Actions: Read and write
+```
+
+The external cron job should make this HTTP request:
+
+```bash
+curl -L \
+  -X POST \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  https://api.github.com/repos/ZionPeng112/email_assist/actions/workflows/daily-digest.yml/dispatches \
+  -d '{"ref":"main"}'
+```
+
+Do not store the token in this repository.
 
 ## Daily Command
 
-The scheduled job runs:
+The dispatched workflow runs:
 
 ```bash
 python -m email_assistant.main daily --yesterday
 ```
 
-Because `--yesterday` uses `LOCAL_TIMEZONE=Asia/Shanghai`, the workflow covers the full previous
-local day, from 00:00 through 24:00 Asia/Shanghai. The digest itself is dated on the send day, so
+Because `--yesterday` uses `LOCAL_TIMEZONE=Asia/Hong_Kong`, the workflow covers the full previous
+local day, from 00:00 through 24:00 Asia/Hong_Kong. The digest itself is dated on the send day, so
 events happening that morning/day are still shown under "今天的活动".
 
 Before sending, the app checks Gmail Sent mail for the same recipient and digest subject. To

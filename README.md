@@ -116,20 +116,22 @@ python -m email_assistant.main daily --hours 24
 
 ## GitHub Actions
 
-The repository includes a scheduled workflow:
+The repository includes a dispatch-only workflow:
 
 ```text
 .github/workflows/daily-digest.yml
 ```
 
-It starts a temporary Linux runner every day at 11:40 Asia/Shanghai. It installs Python
+An external cron service should trigger it every day at 11:40 Asia/Hong_Kong through GitHub's
+`workflow_dispatch` REST API. The workflow starts a temporary Linux runner, installs Python
 dependencies, restores Gmail OAuth from GitHub Secrets, runs tests, and sends the Daily Digest with:
 
 ```bash
 python -m email_assistant.main daily --yesterday
 ```
 
-See [docs/github-actions.md](docs/github-actions.md) for the required secrets and setup commands.
+See [docs/github-actions.md](docs/github-actions.md) for the required secrets and external cron
+setup.
 
 ## Module Boundaries
 

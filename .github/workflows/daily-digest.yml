@@ -1,9 +1,6 @@
 name: Daily Email Digest
 
 on:
-  schedule:
-    # 11:40 Asia/Shanghai. GitHub Actions schedules are UTC.
-    - cron: "40 3 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -51,7 +48,7 @@ jobs:
           GOOGLE_OAUTH_TOKEN_FILE: data/google_token.json
           TARGET_EMAIL: zionpeng112@gmail.com
           ALLOWED_SENDER_DOMAINS: polyu.edu.hk
-          LOCAL_TIMEZONE: Asia/Shanghai
+          LOCAL_TIMEZONE: Asia/Hong_Kong
           N1N_API_KEY: ${{ secrets.N1N_API_KEY }}
           N1N_BASE_URL: https://api.n1n.ai/v1
           LLM_MODEL: gpt-5.5
