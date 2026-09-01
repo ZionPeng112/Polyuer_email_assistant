@@ -6,8 +6,7 @@ The daily workflow is defined in:
 .github/workflows/daily-digest.yml
 ```
 
-It runs every day at 09:30 Asia/Shanghai, with a 09:45 backup schedule in case GitHub
-drops or delays the first scheduled event. It can also be started manually from the GitHub
+It runs every day at 11:25 Asia/Shanghai and can also be started manually from the GitHub
 Actions tab.
 
 The cloud workflow keeps image analysis enabled:
@@ -61,6 +60,9 @@ data/emails.db
 
 They are not committed to the repository.
 
+Scheduled workflow logs only report processing and delivery status. They do not print the digest
+body, evidence fields, or "判断依据" content.
+
 ## Daily Command
 
 The scheduled job runs:
@@ -73,6 +75,5 @@ Because `--yesterday` uses `LOCAL_TIMEZONE=Asia/Shanghai`, the workflow covers t
 local day, from 00:00 through 24:00 Asia/Shanghai. The digest itself is dated on the send day, so
 events happening that morning/day are still shown under "今天的活动".
 
-Before sending, the app checks Gmail Sent mail for the same recipient and digest subject. If the
-09:30 run already sent the digest, the 09:45 backup run exits without sending a duplicate. To
+Before sending, the app checks Gmail Sent mail for the same recipient and digest subject. To
 override this for a manual resend, run `send-digest` or `daily` with `--force-send`.

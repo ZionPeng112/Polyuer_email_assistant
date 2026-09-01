@@ -34,6 +34,7 @@ def main() -> None:
             limit=args.limit,
             dry_run=args.dry_run,
             force=args.force,
+            print_digest=args.print_digest,
         )
     elif args.command == "digest":
         window = _window_from_args(args, config)
@@ -90,6 +91,7 @@ def _process(
     limit: int | None,
     dry_run: bool,
     force: bool = False,
+    print_digest: bool = False,
 ) -> None:
     config.require_llm()
     since, until = window
@@ -183,8 +185,8 @@ def _process(
     )
     if analyses:
         if dry_run:
-            print(json.dumps([item.to_dict() for item in analyses], ensure_ascii=False, indent=2))
-        else:
+            print(json.dumps([_analysis_log_record(item) for item in analyses], ensure_ascii=False, indent=2))
+        elif print_digest:
             print()
             print(build_daily_digest_zh(analyses))
 
@@ -250,6 +252,21 @@ def _build_digest(analyses, *, language: str, digest_date=None) -> str:
     if language == "zh":
         return build_daily_digest_zh(analyses, digest_date=digest_date)
     return build_daily_digest(analyses)
+
+
+def _analysis_log_record(analysis) -> dict[str, object]:
+    return {
+        "email_id": analysis.email_id,
+        "subject": analysis.subject,
+        "category": analysis.category.value,
+        "importance": analysis.importance.value,
+        "mandatory": analysis.mandatory,
+        "action_required": analysis.action_required,
+        "has_deadline": analysis.deadline is not None,
+        "has_event_time": analysis.event_time is not None,
+        "has_location": analysis.location is not None,
+        "confidence": analysis.confidence,
+    }
 
 
 @contextmanager
@@ -336,6 +353,7 @@ def _parse_args() -> argparse.Namespace:
     process.add_argument("--limit", type=int, default=None)
     process.add_argument("--dry-run", action="store_true")
     process.add_argument("--force", action="store_true")
+    process.add_argument("--print-digest", action="store_true")
 
     digest = subparsers.add_parser("digest", help="Build digest from saved analyses.")
     digest.add_argument("--hours", type=int, default=24)

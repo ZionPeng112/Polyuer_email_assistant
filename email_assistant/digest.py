@@ -187,8 +187,6 @@ def _format_item_zh(item: EmailAnalysis) -> list[str]:
         details.append(f"Event time：{item.event_time}")
     if item.location:
         details.append(f"Venue：{item.location}")
-    if item.evidence:
-        details.append(f"判断依据：{item.evidence}")
     if details:
         lines.append(f"  {'；'.join(details)}")
     return lines

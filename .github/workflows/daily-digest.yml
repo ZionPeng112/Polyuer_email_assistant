@@ -2,10 +2,8 @@ name: Daily Email Digest
 
 on:
   schedule:
-    # 09:30 Asia/Shanghai. GitHub Actions schedules are UTC.
-    - cron: "30 1 * * *"
-    # Backup trigger in case GitHub drops or delays the first scheduled event.
-    - cron: "45 1 * * *"
+    # 11:25 Asia/Shanghai. GitHub Actions schedules are UTC.
+    - cron: "25 3 * * *"
   workflow_dispatch:
 
 concurrency:

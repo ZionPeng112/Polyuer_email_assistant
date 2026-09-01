@@ -122,9 +122,8 @@ The repository includes a scheduled workflow:
 .github/workflows/daily-digest.yml
 ```
 
-It starts a temporary Linux runner every day at 09:30 Asia/Shanghai, with a 09:45 backup
-schedule in case GitHub drops the first scheduled event. It installs Python dependencies,
-restores Gmail OAuth from GitHub Secrets, runs tests, and sends the Daily Digest with:
+It starts a temporary Linux runner every day at 11:25 Asia/Shanghai. It installs Python
+dependencies, restores Gmail OAuth from GitHub Secrets, runs tests, and sends the Daily Digest with:
 
 ```bash
 python -m email_assistant.main daily --yesterday

@@ -1,5 +1,6 @@
 from email_assistant.digest import build_daily_digest
 from email_assistant.digest import build_daily_digest_zh
+from email_assistant.digest import build_structured_daily_digest_zh
 from email_assistant.models import EmailAnalysis, EmailCategory, Importance
 
 
@@ -101,3 +102,28 @@ def test_zh_digest_suppresses_departmental_seminar_credit_must_item():
     assert "All RPg students must earn" not in digest
     assert "departmental seminar" not in digest
     assert "credit" not in digest
+
+
+def test_structured_zh_digest_does_not_print_evidence():
+    digest = build_structured_daily_digest_zh(
+        [
+            EmailAnalysis(
+                email_id="1",
+                subject="Course registration",
+                category=EmailCategory.MUST_ACTION,
+                importance=Importance.HIGH,
+                summary="需要确认 course registration。",
+                mandatory=True,
+                action_required=True,
+                action="确认 course registration。",
+                deadline="2026-09-02",
+                event_time=None,
+                location=None,
+                evidence="You are required to confirm",
+                confidence=0.96,
+            )
+        ]
+    )
+
+    assert "判断依据" not in digest
+    assert "You are required to confirm" not in digest
