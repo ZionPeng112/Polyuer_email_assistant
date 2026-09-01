@@ -67,6 +67,9 @@ class GmailProvider:
 
     def list_message_ids(self, *, since: datetime, limit: int | None = None) -> list[str]:
         query = f"after:{since.astimezone(timezone.utc).strftime('%Y/%m/%d')}"
+        return self.search_message_ids(query=query, limit=limit)
+
+    def search_message_ids(self, *, query: str, limit: int | None = None) -> list[str]:
         request = self._service.users().messages().list(
             userId=self.user_id,
             q=query,
@@ -81,6 +84,14 @@ class GmailProvider:
                 return ids[:limit]
             request = self._service.users().messages().list_next(request, response)
         return ids
+
+    def has_sent_email(self, *, recipient: str, subject: str) -> bool:
+        safe_subject = subject.replace('"', " ")
+        ids = self.search_message_ids(
+            query=f'in:sent to:{recipient} subject:"{safe_subject}"',
+            limit=1,
+        )
+        return bool(ids)
 
     def retrieve_email(self, message_id: str) -> RawEmail:
         payload = (

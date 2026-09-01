@@ -50,6 +50,7 @@ def main() -> None:
             window=window,
             language=args.language,
             digest_date=_digest_date_from_args(args, window, config),
+            force_send=args.force_send,
         )
     elif args.command == "daily":
         window = _window_from_args(args, config)
@@ -59,6 +60,7 @@ def main() -> None:
             window=window,
             language=args.language,
             digest_date=_digest_date_from_args(args, window, config),
+            force_send=args.force_send,
         )
     else:
         raise ValueError(f"Unknown command: {args.command}")
@@ -217,6 +219,7 @@ def _send_digest(
     window: tuple[datetime, datetime | None],
     language: str,
     digest_date,
+    force_send: bool = False,
 ) -> None:
     if config.mail_provider != "gmail":
         raise ValueError("send-digest currently uses Gmail API. Set MAIL_PROVIDER=gmail.")
@@ -227,6 +230,12 @@ def _send_digest(
     digest = _build_digest(analyses, language=language, digest_date=digest_date)
     subject = f"{config.digest_subject_prefix} - {digest_date.strftime('%Y-%m-%d')}"
     with gmail_provider(config) as gmail:
+        if not force_send and gmail.has_sent_email(
+            recipient=config.digest_recipient_email,
+            subject=subject,
+        ):
+            print(f"Digest already sent to {config.digest_recipient_email} with subject: {subject}")
+            return
         sent = gmail.send_email(
             sender=config.digest_from_email,
             recipient=config.digest_recipient_email,
@@ -343,6 +352,7 @@ def _parse_args() -> argparse.Namespace:
     send_digest.add_argument("--date")
     send_digest.add_argument("--digest-date")
     send_digest.add_argument("--language", choices=["en", "zh"], default="zh")
+    send_digest.add_argument("--force-send", action="store_true")
 
     daily = subparsers.add_parser("daily", help="Process recent emails and email the digest.")
     daily.add_argument("--hours", type=int, default=24)
@@ -353,6 +363,7 @@ def _parse_args() -> argparse.Namespace:
     daily.add_argument("--limit", type=int, default=None)
     daily.add_argument("--language", choices=["en", "zh"], default="zh")
     daily.add_argument("--force", action="store_true")
+    daily.add_argument("--force-send", action="store_true")
 
     return parser.parse_args()
 

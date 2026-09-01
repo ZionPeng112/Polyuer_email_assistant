@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from typing import Protocol
 
 from email_assistant.models import EmailAnalysis, EmailCategory, Importance, LLMImage, ParsedEmail
@@ -42,6 +43,9 @@ Rules:
 - "You are invited to attend" means OPTIONAL_EVENT unless mandatory wording is present.
 - Use MUST_ATTEND only when attendance is explicitly compulsory, required, mandatory, or equivalent.
 - Use MUST_ACTION when the student must submit, register, confirm, pay, complete, upload, reply, or perform another required task.
+- Do not use MUST_ACTION for broad academic/program requirements stated as general policy,
+  such as RPg departmental seminar credit requirements, unless this email asks the
+  recipient to complete a concrete immediate task like submitting a form or confirming by a deadline.
 - Use ACADEMIC_NOTICE for important academic information without a required action.
 - If images are provided, inspect them for deadlines, event times, locations, QR poster text,
   mandatory wording, and action instructions that may not appear in the plain text body.
@@ -113,7 +117,7 @@ def _analysis_from_payload(email_id: str, payload: dict[str, object]) -> EmailAn
         payload.get("action_required", category in {EmailCategory.MUST_ACTION, EmailCategory.MUST_ATTEND})
     )
 
-    return EmailAnalysis(
+    analysis = EmailAnalysis(
         email_id=email_id,
         category=category,
         importance=importance,
@@ -126,6 +130,43 @@ def _analysis_from_payload(email_id: str, payload: dict[str, object]) -> EmailAn
         location=_optional_str(payload.get("location")),
         evidence=_optional_str(payload.get("evidence")),
         confidence=confidence,
+    )
+    return _normalize_academic_requirement(analysis)
+
+
+def _normalize_academic_requirement(analysis: EmailAnalysis) -> EmailAnalysis:
+    if not _is_departmental_seminar_credit_requirement(analysis):
+        return analysis
+    category = analysis.category
+    if category in {EmailCategory.MUST_ACTION, EmailCategory.MUST_ATTEND}:
+        category = EmailCategory.ACADEMIC_NOTICE
+    return replace(
+        analysis,
+        category=category,
+        summary="这封邮件包含 RPg academic notice，没有需要立即处理的个人任务。",
+        mandatory=False,
+        action_required=False,
+        action=None,
+        deadline=None,
+        evidence=None,
+    )
+
+
+def _is_departmental_seminar_credit_requirement(analysis: EmailAnalysis) -> bool:
+    text = " ".join(
+        item
+        for item in (
+            analysis.summary,
+            analysis.action,
+            analysis.evidence,
+        )
+        if item
+    ).lower()
+    return (
+        "rpg" in text
+        and "departmental seminar" in text
+        and "credit" in text
+        and ("must earn" in text or "must obtain" in text or "must complete" in text or "至少" in text)
     )
 
 

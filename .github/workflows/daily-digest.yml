@@ -4,7 +4,13 @@ on:
   schedule:
     # 09:30 Asia/Shanghai. GitHub Actions schedules are UTC.
     - cron: "30 1 * * *"
+    # Backup trigger in case GitHub drops or delays the first scheduled event.
+    - cron: "45 1 * * *"
   workflow_dispatch:
+
+concurrency:
+  group: daily-email-digest
+  cancel-in-progress: false
 
 jobs:
   daily-digest:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time
 import re
 
@@ -69,16 +69,16 @@ def build_human_daily_digest_zh(
     period_label: str = "过去 24 小时",
 ) -> str:
     digest_date = digest_date or date.today()
+    prepared = [_prepare_item(item) for item in analyses]
     grouped: dict[EmailCategory, list[EmailAnalysis]] = defaultdict(list)
-    for analysis in analyses:
-        grouped[analysis.category].append(analysis)
+    for item in prepared:
+        grouped[item.analysis.category].append(item.analysis)
 
     total = len(analyses)
     action_count = len(grouped.get(EmailCategory.MUST_ACTION, []))
     attend_count = len(grouped.get(EmailCategory.MUST_ATTEND, []))
     optional_count = len(grouped.get(EmailCategory.OPTIONAL_EVENT, []))
 
-    prepared = [_prepare_item(item) for item in analyses]
     today_items = _today_activities(prepared, digest_date)
     upcoming_items = _upcoming_items(prepared, digest_date, today_items)
     other_items = _other_items(prepared, today_items, upcoming_items)
@@ -103,7 +103,6 @@ def build_human_daily_digest_zh(
                 _format_human_item(
                     item,
                     digest_date=digest_date,
-                    include_mandatory_evidence=True,
                 )
             )
         lines.append("")
@@ -205,6 +204,7 @@ class DigestItem:
 
 
 def _prepare_item(analysis: EmailAnalysis) -> DigestItem:
+    analysis = _normalize_digest_analysis(analysis)
     return DigestItem(
         analysis=analysis,
         title=_human_title(analysis),
@@ -257,7 +257,6 @@ def _format_human_item(
     item: DigestItem,
     *,
     digest_date: date,
-    include_mandatory_evidence: bool = False,
 ) -> list[str]:
     analysis = item.analysis
     prefix = _time_prefix(item, digest_date)
@@ -277,12 +276,44 @@ def _format_human_item(
     if extra:
         lines.append(extra)
 
-    if include_mandatory_evidence and analysis.evidence:
-        label = "为什么判断为必须参加" if analysis.category == EmailCategory.MUST_ATTEND else "为什么判断为必须处理"
-        lines.append(f"{label}：{analysis.evidence}")
-
     lines.append("")
     return lines
+
+
+def _normalize_digest_analysis(analysis: EmailAnalysis) -> EmailAnalysis:
+    if not _is_departmental_seminar_credit_requirement(analysis):
+        return analysis
+    category = analysis.category
+    if category in {EmailCategory.MUST_ACTION, EmailCategory.MUST_ATTEND}:
+        category = EmailCategory.ACADEMIC_NOTICE
+    return replace(
+        analysis,
+        category=category,
+        mandatory=False,
+        action_required=False,
+        summary="这封邮件包含 RPg academic notice，没有需要立即处理的个人任务。",
+        action=None,
+        deadline=None,
+        evidence=None,
+    )
+
+
+def _is_departmental_seminar_credit_requirement(analysis: EmailAnalysis) -> bool:
+    text = " ".join(
+        item
+        for item in (
+            analysis.summary,
+            analysis.action,
+            analysis.evidence,
+        )
+        if item
+    ).lower()
+    return (
+        "rpg" in text
+        and "departmental seminar" in text
+        and "credit" in text
+        and ("must earn" in text or "must obtain" in text or "must complete" in text or "至少" in text)
+    )
 
 
 def _human_title(analysis: EmailAnalysis) -> str:
