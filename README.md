@@ -72,6 +72,7 @@ GitHub Actions 自带的 `schedule` 是 best-effort cron。实际测试中，这
 - 通过 Gmail API 自动发送 digest
 - 发送前检查 Gmail Sent，避免同一天重复发送同标题日报
 - workflow 日志只记录处理数量和发送状态，不打印邮件正文、判断依据或 digest 内容
+- 图片只在运行时下载到内存，不持久化保存
 
 ## 邮件分类规则
 
@@ -187,6 +188,43 @@ https://www.googleapis.com/auth/gmail.readonly
 https://www.googleapis.com/auth/gmail.send
 ```
 
+## 数据与图片存储
+
+图片处理是运行时完成的，不会长期保存图片文件：
+
+```text
+Gmail attachment / HTML image URL
+        ↓
+下载为内存中的 bytes
+        ↓
+检查 content-type 和大小限制
+        ↓
+转换成 data:image/...;base64
+        ↓
+随 LLM 请求发送
+        ↓
+进程结束后释放
+```
+
+默认限制：
+
+```env
+MAX_IMAGE_ATTACHMENTS=4
+MAX_IMAGE_BYTES=2000000
+```
+
+也就是说，单封邮件最多取 4 张图片，单张图片默认最大 2 MB。base64 编码会比原始图片大约多三分之一，所以一次运行的图片内存占用是有上限的。
+
+SQLite 中会保存：
+
+- 邮件 ID、标题、发件人、收件人和时间
+- 邮件正文的 SHA-256 hash
+- 附件 metadata
+- HTML 图片 metadata
+- LLM 分析结果
+
+SQLite 不保存原始邮件正文，也不保存图片 bytes。当前没有定期清理数据库的机制；本地长期运行时，`data/emails.db` 会随已分析邮件数量增长。GitHub Actions runner 是临时环境，每次 workflow 运行后本地数据库文件都会随 runner 销毁。
+
 ## GitHub Actions 部署
 
 仓库中保留一个 dispatch-only workflow：
@@ -280,4 +318,4 @@ python -m pytest
 
 ## 许可证
 
-本仓库目前没有包含 `LICENSE` 文件。开源发布前建议补充明确许可证，例如 MIT、Apache-2.0 或其他适合你的许可证。
+本项目使用 MIT License。完整文本见 [LICENSE](LICENSE)。
