@@ -1,10 +1,19 @@
 # email_assistant
 
-一个面向学生邮箱的自动日报助手。它会每天读取指定 Gmail 收件箱中的学校邮件，解析正文和图片内容，用 LLM 判断邮件是否需要处理、是否是活动通知或学术 notice，然后自动整理成一封中文 digest 发到你的邮箱。
+`email_assistant` 是一个自动邮件日报助手：每天读取 Gmail 中的学校邮件，用 LLM 判断哪些邮件需要处理、哪些只是活动或学术通知，然后生成一封简体中文 digest 自动发到指定邮箱。
 
-这个项目最初用于 PolyU 邮件场景，但整体结构可以复用到其他学校或组织邮箱：只需要替换发件人域名、目标邮箱和提示词规则。
+项目最初用于 PolyU 学生邮箱场景，但核心流程不依赖 PolyU。你可以替换发件人域名、目标邮箱、提示词规则和日报文案，把它改成适合其他学校、实验室、社团或组织邮箱的自动日报系统。
+
+## 适合什么场景
+
+- 学校邮箱通知太多，希望每天只看一封摘要
+- 邮件经常包含活动海报、HTML 图片或长通知，需要自动提取时间、地点、deadline
+- 想区分“必须处理”和“可选关注”，减少漏看重要事项
+- 希望用 GitHub Actions 执行任务，但不依赖 GitHub 内置 cron 的准时性
 
 ## Pipeline
+
+邮件处理链路：
 
 ```text
 学校邮件 / 转发邮件
@@ -40,46 +49,50 @@ python -m email_assistant.main daily --yesterday
 发送每日 Email Digest
 ```
 
-## 为什么不用 GitHub Actions schedule
+## 为什么用外部 Cron
 
-GitHub Actions 自带的 `schedule` 是 best-effort cron。实际测试中，这个仓库出现过 workflow 处于 active、YAML 在默认分支、cron 表达式正确，但 scheduled event 没有被创建的情况。对于“每天必须稳定发日报”的任务，这种不确定性不可接受。
+GitHub Actions 自带的 `schedule` 是 best-effort cron。实际测试中，这个仓库出现过 workflow 处于 active、YAML 已在默认分支、cron 表达式正确，但 scheduled event 没有被创建的情况。
 
-因此当前方案是：
+日报属于“每天必须稳定发送”的任务，因此当前设计是：
 
 - GitHub Actions 只保留 `workflow_dispatch`
-- 使用外部 cron 服务定时调用 GitHub REST API
+- 定时触发交给外部 cron 服务
 - 推荐使用 [cron-job.org](https://console.cron-job.org/dashboard)
+- GitHub 只负责执行 workflow 和发送邮件
 
-这样 GitHub 只负责执行任务，定时触发交给专门的 cron 服务。
+这种方案更容易观测：如果没有邮件，可以分别检查 cron-job.org 请求记录、GitHub Actions run、以及 Gmail Sent。
 
 ## 功能
 
-- 自动读取最近一天的 Gmail 邮件
-- 只处理指定发件人域名，例如 `polyu.edu.hk`
-- 支持 HTML 邮件、纯文本邮件和图片附件
-- 使用 LLM 输出分类、摘要、deadline、活动时间和地点
-- 生成中文每日 digest
-- 自动通过 Gmail API 发出日报
-- 发送前检查 Gmail Sent，避免同一天重复发送同标题 digest
+- 自动读取 Gmail 中最近一天的邮件
+- 按发件人域名过滤，例如只处理 `polyu.edu.hk`
+- 支持纯文本、HTML 邮件、图片附件和远程 HTML 图片
+- 使用 LLM 提取摘要、分类、deadline、活动时间和地点
+- 生成简体中文每日 digest
+- 通过 Gmail API 自动发送 digest
+- 发送前检查 Gmail Sent，避免同一天重复发送同标题日报
 - workflow 日志只记录处理数量和发送状态，不打印邮件正文、判断依据或 digest 内容
 
-## 邮件分类
-
-项目会把邮件分成几类：
+## 邮件分类规则
 
 ```text
-MUST_ACTION      需要你完成明确动作，例如提交、注册、确认、付款、上传
+MUST_ACTION      需要完成明确动作，例如提交、注册、确认、付款、上传
 MUST_ATTEND      明确要求必须参加
 ACADEMIC_NOTICE  重要学术通知，但没有立即要做的个人任务
 OPTIONAL_EVENT   可选活动、讲座、seminar、workshop
 GENERAL          普通通知
 ```
 
-一个重要规则是：`You are invited to attend` 默认只是可选活动。只有邮件明确写出 compulsory、required、mandatory 等强制措辞，才会被判为必须参加。
+关键规则：
 
-长期学术要求，例如 “RPg students must earn departmental seminar credits”，不会进入“必须关注”，也不会把判断依据打印到 workflow 日志里。
+- `You are invited to attend` 默认是可选活动
+- 只有出现 compulsory、required、mandatory 等明确强制措辞，才会判为必须参加
+- 长期学术要求，例如 RPg departmental seminar credit requirement，不进入“必须关注”
+- 判断依据不会写入 GitHub Actions 日志
 
-## 本地准备
+## 快速开始
+
+准备 Python 环境：
 
 ```bash
 python3 -m venv .venv
@@ -88,7 +101,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-然后填写 `.env`：
+填写 `.env`，最小配置如下：
 
 ```env
 MAIL_PROVIDER=gmail
@@ -112,27 +125,60 @@ DIGEST_FROM_EMAIL=your-gmail@example.com
 DIGEST_SUBJECT_PREFIX=PolyU 每日 Email Digest
 ```
 
+## 手动发送
+
+本地手动跑一次完整日报流程：
+
+```bash
+python -m email_assistant.main daily --yesterday
+```
+
+这条命令会处理本地时区中“昨天 00:00 到 24:00”的邮件，并发送一封以今天日期命名的 digest。
+
+## 配置说明
+
+| 变量 | 作用 |
+| --- | --- |
+| `MAIL_PROVIDER` | 邮件 provider，目前默认使用 `gmail` |
+| `GMAIL_USER` | Gmail API user，一般使用 `me` |
+| `GMAIL_ACCOUNT_EMAIL` | 用于校验当前 OAuth token 属于哪个 Gmail 账号 |
+| `GOOGLE_OAUTH_CLIENT_SECRETS` | Google OAuth client JSON 路径 |
+| `GOOGLE_OAUTH_TOKEN_FILE` | Google OAuth token JSON 路径 |
+| `TARGET_EMAIL` | 要读取和过滤的目标收件邮箱 |
+| `ALLOWED_SENDER_DOMAINS` | 允许处理的发件人域名，逗号分隔 |
+| `LOCAL_TIMEZONE` | 本地日期窗口时区，例如 `Asia/Hong_Kong` |
+| `N1N_API_KEY` | n1n API key |
+| `N1N_BASE_URL` | OpenAI-compatible API base URL |
+| `LLM_MODEL` | 用于分析邮件的模型名 |
+| `N1N_TIMEOUT_SECONDS` | LLM 请求超时时间 |
+| `DATABASE_URL` | SQLite 数据库地址 |
+| `DIGEST_RECIPIENT_EMAIL` | digest 收件人 |
+| `DIGEST_FROM_EMAIL` | digest 发件人 |
+| `DIGEST_SUBJECT_PREFIX` | digest 邮件标题前缀 |
+| `ENABLE_IMAGE_ANALYSIS` | 是否分析图片附件和 HTML 图片 |
+| `ENABLE_REMOTE_IMAGE_URLS` | 是否下载并分析远程 HTML 图片 |
+| `MAX_IMAGE_ATTACHMENTS` | 单封邮件最多分析多少张图片 |
+| `MAX_IMAGE_BYTES` | 单张图片最大字节数 |
+
 ## Gmail OAuth
 
-需要在 Google Cloud Console 中创建 Gmail OAuth 凭据：
+Gmail 读信和发信都通过 OAuth 完成。需要在 Google Cloud Console 中准备凭据：
 
 1. 创建或选择一个 Google Cloud project
 2. Enable Gmail API
 3. 配置 OAuth consent screen
 4. 创建 OAuth Client ID，类型选择 `Desktop app`
-5. 下载 JSON，保存到：
+5. 下载 JSON，保存到 `credentials/google_oauth_client.json`
+
+首次运行 Gmail 相关命令时会打开浏览器授权。授权成功后，refresh token 会保存到 `data/google_token.json`。
+
+不要提交以下文件：
 
 ```text
 credentials/google_oauth_client.json
-```
-
-首次本地运行 Gmail 相关命令时会打开浏览器授权。授权成功后，refresh token 会保存到：
-
-```text
 data/google_token.json
+data/emails.db
 ```
-
-这两个文件都不应该提交到 Git。
 
 项目需要的 Gmail scope：
 
@@ -140,16 +186,6 @@ data/google_token.json
 https://www.googleapis.com/auth/gmail.readonly
 https://www.googleapis.com/auth/gmail.send
 ```
-
-## 手动发送
-
-如果你想手动跑一次完整日报流程，只保留这一条命令即可：
-
-```bash
-python -m email_assistant.main daily --yesterday
-```
-
-它会处理昨天 00:00 到 24:00 的邮件，并发送当天日期的 digest。
 
 ## GitHub Actions 部署
 
@@ -174,17 +210,9 @@ base64 -i credentials/google_oauth_client.json | pbcopy
 base64 -i data/google_token.json | pbcopy
 ```
 
-workflow 每次运行时会在临时 runner 中还原：
+workflow 每次运行时会在临时 runner 中还原 OAuth 文件和 SQLite 数据库。运行时文件不会提交到仓库。
 
-```text
-credentials/google_oauth_client.json
-data/google_token.json
-data/emails.db
-```
-
-这些运行时文件不会提交到仓库。
-
-## 外部 Cron 配置
+## cron-job.org 配置
 
 在 [cron-job.org](https://console.cron-job.org/dashboard) 新建一个 cron job，每天 11:40 Asia/Hong_Kong 调用 GitHub workflow dispatch API。
 
@@ -206,7 +234,7 @@ Asia/Hong_Kong
 40 3 * * *
 ```
 
-创建 GitHub fine-grained personal access token，只给当前仓库：
+创建 GitHub fine-grained personal access token，只给目标仓库：
 
 ```text
 Actions: Read and write
@@ -219,11 +247,11 @@ curl -L \
   -X POST \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/ZionPeng112/email_assist/actions/workflows/daily-digest.yml/dispatches \
+  https://api.github.com/repos/OWNER/REPO/actions/workflows/daily-digest.yml/dispatches \
   -d '{"ref":"main"}'
 ```
 
-不要把 token 写进仓库。
+把 `OWNER/REPO` 替换成你的仓库，例如 `ZionPeng112/email_assist`。不要把 token 写进仓库。
 
 ## 项目结构
 
@@ -237,12 +265,19 @@ email_assistant/
   database.py          SQLite 存储
   providers/gmail.py   Gmail 读取和发送
   providers/n1n.py     OpenAI-compatible LLM provider
+  providers/resend.py  Resend inbound fallback provider
 ```
 
-## 测试
+## 开发
+
+运行测试：
 
 ```bash
 python -m pytest
 ```
 
-当前测试覆盖 Gmail 解析、发送 provider、图片处理、发件人过滤、LLM 分类兜底和 digest 输出规则。
+当前测试覆盖 Gmail 解析、发送 provider、图片处理、发件人过滤、LLM 分类兜底、SQLite 存储和 digest 输出规则。
+
+## 许可证
+
+本仓库目前没有包含 `LICENSE` 文件。开源发布前建议补充明确许可证，例如 MIT、Apache-2.0 或其他适合你的许可证。
